@@ -38,6 +38,9 @@ import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.hl7.fhir.r4.model.Bundle;
 
@@ -178,7 +181,7 @@ public class Websocket {
     }
 
     void sendAllKBVExamples(String folder, Session senderSession) {
-        if(folder.equals("../src/test/resources/kbv-zip")) {
+        if(folder.equals("src/test/resources/kbv-zip")) {
             try {
                 Bundle bundle = ctx.newXmlParser().parseResource(Bundle.class, getXmlString(folder + "/PF01.xml"));
                 bundle.setId(UUID.randomUUID().toString());
@@ -278,7 +281,11 @@ public class Websocket {
                         }
                     });
             } else if ("XMLBundle".equals(object.getString("type"))) {
-                Bundle[] bundles = XmlPrescriptionProcessor.parseFromString(object.getString("payload"));
+                String payload = object.getJsonArray("payload").get(0).asJsonArray().get(0).toString();
+                JsonNode jsonNode = new ObjectMapper().readTree(payload);
+                String xmlBundle = new XmlMapper().writeValueAsString(jsonNode)
+                    .replace("ObjectNode", "Bundle");
+                Bundle[] bundles = XmlPrescriptionProcessor.parseFromString(xmlBundle);
                 if(appConfig.getXmlBundleDirectProcess()) {
                     SignAndUploadBundlesEvent event = new SignAndUploadBundlesEvent(bundles, senderSession, messageId);
                     signAndUploadBundlesEvent.fireAsync(event);   
